@@ -81,6 +81,16 @@ public:
         m_isDirty = isDirty;
     }
 
+    bool isLinked() const
+    {
+        return m_linkedInputPorts.size() > 0 || m_linkedOutputPorts.size() > 0;
+    }
+
+    bool isUnlinked() const
+    {
+        return m_linkedInputPorts.empty() && m_linkedOutputPorts.empty();
+    }
+
     std::vector<Port*> linkedInputPorts()
     {
         return m_linkedInputPorts;
@@ -280,14 +290,24 @@ public:
 protected:
     void findInputNode(Node* node, std::queue<Node*>& inputNodes)
     {
-        for (Port* curNodePort: node->ports()) {
-            if (curNodePort->type() == PortType::OUTPUT_PORT && curNodePort->node()->isInput())
-            {
-                inputNodes.push(curNodePort->node());
-            }
+        for (Port* port : node->ports()) {
+            if (port->type() == PortType::OUTPUT_PORT) continue;
             else {
-                for (Port* port : curNodePort->linkedOutputPorts()) {
-                    findInputNode(port->node(), inputNodes);
+                for (Port* p : port->linkedOutputPorts()) {
+                    Node* n = p->node();
+                    bool anyInputsLinked = false;
+                    for (Port* nextNodePort : n->ports())
+                    {
+                        if (nextNodePort->type() == PortType::OUTPUT_PORT) continue;
+                        else {
+                            if (nextNodePort->isLinked()) anyInputsLinked = true;
+                        }
+                    }
+
+                    if (anyInputsLinked)
+                        findInputNode(n, inputNodes);
+                    else
+                        inputNodes.push(n);
                 }
             }
         }
@@ -364,18 +384,16 @@ int main()
     int1Node->port("output")->setData(Any(3));
 
     AddNode* add2Node = new AddNode();
-
-    OutputNode* output1Node = new OutputNode();
-
     add1Node->port("output")->linkPort(add2Node->port("num1"));
     int1Node->port("output")->linkPort(add2Node->port("num2"));
+    
+    OutputNode* output1Node = new OutputNode();
     add2Node->port("output")->linkPort(output1Node->port("output"));
 
     IntNode* int2Node = new IntNode();
     int2Node->port("output")->setData(Any(4));
     
     OutputNode* output2Node = new OutputNode();
-    
     int2Node->port("output")->linkPort(output2Node->port("output"));
 
     Graph* graph = new Graph();
