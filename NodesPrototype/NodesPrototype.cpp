@@ -1,5 +1,5 @@
+#include <algorithm>
 #include <iostream>
-#include <set>
 #include <string>
 #include <queue>
 #include <vector>
@@ -152,6 +152,12 @@ protected:
 class Node
 {
 public:
+    Node()
+    {
+        m_beenVisited = false;
+        m_indegree = 0;
+    }
+
     ~Node()
     {
         DEL_STD_VEC(m_ports);
@@ -163,6 +169,19 @@ public:
     {
         port->setNode(this);
         m_ports.push_back(port);
+
+        if (port->type() == PortType::INPUT_PORT)
+            m_indegree += 1;
+    }
+
+    bool beenVisited() const
+    {
+        return m_beenVisited;
+    }
+
+    void setBeenVisited(bool beenVisited)
+    {
+        m_beenVisited = beenVisited;
     }
 
     Port* port(int index)
@@ -183,6 +202,48 @@ public:
         }
 
         return nullptr;
+    }
+
+    int indegree() const
+    {
+        return m_indegree;
+    }
+
+    void setIndegree(int indegree)
+    {
+        m_indegree = indegree;
+    }
+
+    std::vector<Port*> inputPorts()
+    {
+        std::vector<Port*> inputPorts;
+
+        for (Port* port : m_ports) {
+            if (port->type() == PortType::INPUT_PORT)
+                inputPorts.push_back(port);
+        }
+
+        return inputPorts;
+    }
+
+    std::vector<Port*> outputPorts()
+    {
+        std::vector<Port*> outputPorts;
+
+        for (Port* port : m_ports) {
+            if (port->type() == PortType::OUTPUT_PORT)
+                outputPorts.push_back(port);
+        }
+
+        return outputPorts;
+    }
+
+    void resetIndegree()
+    {
+        for (Port* port : m_ports) {
+            if (port->type() == PortType::INPUT_PORT)
+                m_indegree += 1;
+        }
     }
 
     bool isInput() const
@@ -222,6 +283,8 @@ public:
         return m_ports;
     }
 protected:
+    bool m_beenVisited;
+    int m_indegree;
     std::string m_name;
     std::vector<Port*> m_ports;
 };
@@ -253,14 +316,30 @@ public:
             findInputNode(outputNode, inputNodes);
         }
 
-        while (!inputNodes.empty()) {
-            Node* n = inputNodes.front();
-            std::cout << n->name() << std::endl;
-            inputNodes.pop();
-        }
-
-        // Step 2: Perform a topological sort using Kahn's algorithm
+        // Step 2: Perform a topological sort based on Kahn's algorithm
         std::queue<Node*> nodeExecOrder;
+
+        while (!inputNodes.empty())
+        {
+            Node* node = inputNodes.front();
+            nodeExecOrder.push(node);
+            inputNodes.pop();
+
+            if (node->beenVisited()) continue;
+
+            node->setBeenVisited(true);
+
+            for (Port* outputPort : node->outputPorts()) {
+                for (Port* linkedPort : outputPort->linkedInputPorts()) {
+                    Node* linkedPortNode = linkedPort->node();
+                    linkedPortNode->setIndegree(linkedPortNode->indegree() - 1);
+                    if (linkedPortNode->indegree() <= 0) {
+                        nodeExecOrder.push(linkedPortNode);
+                        linkedPortNode->setBeenVisited(true);
+                    }
+                }
+            }
+        }
 
         // Step 3: Run each node's execution method in correct order
 
@@ -268,9 +347,16 @@ public:
         {
             Node* node = nodeExecOrder.front();
 
+            std::cout << node->name() << std::endl;
+
             node->exec();
-            for (int i = 0; i < node->ports().size(); i++) {
-                node->ports()[i]->setIsDirty(false);
+
+            // Step 4: Reset (avoids having to loop through nodes again later)
+            node->setBeenVisited(false);
+            node->resetIndegree();
+
+            for (Port* port : node->ports()) {
+                port->setIsDirty(false);
             }
 
             nodeExecOrder.pop();
@@ -304,8 +390,9 @@ protected:
                         }
                     }
 
-                    if (anyInputsLinked)
+                    if (anyInputsLinked) {
                         findInputNode(n, inputNodes);
+                    }
                     else
                         inputNodes.push(n);
                 }
