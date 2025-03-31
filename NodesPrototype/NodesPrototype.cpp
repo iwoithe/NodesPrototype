@@ -172,13 +172,29 @@ public:
         m_nodes.push_back(node);
     }
 
+    void addOutputNodes(Node* node)
+    {
+        m_outputNodes.push_back(node);
+    }
+
     void exec()
     {
         std::queue<Node*> nodeExecOrder;
     }
 
+    std::vector<Node*> nodes()
+    {
+        return m_nodes;
+    }
+
+    std::vector<Node*> outputNodes()
+    {
+        return m_outputNodes;
+    }
+
 protected:
     std::vector<Node*> m_nodes;
+    std::vector<Node*> m_outputNodes;
 };
 
 class NumNode : public Node
