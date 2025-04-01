@@ -239,6 +239,7 @@ public:
 
     void resetIndegree()
     {
+        m_indegree = 0;
         for (Port* port : m_ports) {
             if (port->type() == PortType::INPUT_PORT)
                 m_indegree += 1;
@@ -281,6 +282,18 @@ public:
     {
         return m_ports;
     }
+
+    void updateInputPortData()
+    {
+        for (Port* port : m_ports) {
+            if (port->type() == PortType::INPUT_PORT)
+            {
+                std::vector<Port*> outputPorts = port->linkedOutputPorts();
+                if (outputPorts.size() > 0)
+                    port->setData(port->linkedOutputPorts()[0]->data());
+            }
+        }
+    }
 protected:
     bool m_beenVisited;
     int m_indegree;
@@ -320,35 +333,40 @@ public:
 
         while (!inputNodes.empty())
         {
+
             Node* node = inputNodes.front();
+
+            if (node->beenVisited()) {
+                inputNodes.pop();
+                continue;
+            }
+            node->setBeenVisited(true);
+
             nodeExecOrder.push(node);
             inputNodes.pop();
-
-            if (node->beenVisited()) continue;
-
-            node->setBeenVisited(true);
 
             for (Port* outputPort : node->outputPorts()) {
                 for (Port* linkedPort : outputPort->linkedInputPorts()) {
                     Node* linkedPortNode = linkedPort->node();
                     linkedPortNode->setIndegree(linkedPortNode->indegree() - 1);
                     if (linkedPortNode->indegree() <= 0) {
-                        nodeExecOrder.push(linkedPortNode);
-                        linkedPortNode->setBeenVisited(true);
+                        inputNodes.push(linkedPortNode);
                     }
                 }
             }
         }
 
         // Step 3: Run each node's execution method in correct order
-
         while (!nodeExecOrder.empty())
         {
             Node* node = nodeExecOrder.front();
 
-            std::cout << node->name() << std::endl;
-
+            node->updateInputPortData();
             node->exec();
+
+            for (Port* port : node->ports()) {
+                std::cout << "[" << node->name() << " Node] Port \"" << port->id() << "\": " << port->get<int>() << std::endl;
+            }
 
             // Step 4: Reset (avoids having to loop through nodes again later)
             node->setBeenVisited(false);
@@ -455,7 +473,7 @@ public:
 
     void exec() override
     {
-        std::cout << "[Output Node] output: " << port("output")->get<int>() << std::endl;
+        std::cout << "[OUTPUT NUMBER] " << port("output")->get<int>() << std::endl;
     }
 };
 
