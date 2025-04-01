@@ -1,11 +1,11 @@
 #include <iostream>
-#include <string>
 #include <queue>
+#include <string>
 #include <vector>
 
 #include "Algorithms.h"
-#include "iwany.h"
 #include "Delete.h"
+#include "iwany.h"
 
 enum PortType
 {
@@ -333,7 +333,6 @@ public:
 
         while (!inputNodes.empty())
         {
-
             Node* node = inputNodes.front();
 
             if (node->beenVisited()) {
